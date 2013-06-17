@@ -64,7 +64,7 @@ function check_device {
 
 function gen_gif {
 	rv=`"$CD" dropdown --title "Create an animated GIF?" \
-		--no-newline --text "Woul you like to create an animated GIF?" \
+		--no-newline --text "Would you like to create an animated GIF?" \
 		--items "Yes - Medium Quality (320x240)" "Yes - High Quality (640x480)" "No" \
 		--button1 OK --button2 Cancel`;
 	read PRESSED TYPE <<< $rv

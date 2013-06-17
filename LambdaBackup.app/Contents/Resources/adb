@@ -1,0 +1,4 @@
+#!/bin/sh
+PLATFORM_TOOL="/usr/local/Cellar/android-sdk/r21.1/platform-tools/adb"
+test -f "$PLATFORM_TOOL" && exec "$PLATFORM_TOOL" "$@"
+echo Use the \`android\' tool to install the \"Android SDK Platform-tools\".

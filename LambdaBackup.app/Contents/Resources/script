@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# LambdaLabsLambdaLabsLamb
+# a                      d
+# m                      a
+# b        \\            L   o                    8           8          o            8
+# d         \\           a   8                    8           8          8            8
+# a          \\          b   8     .oPYo. ooYoYo. 8oPYo. .mEKo8 .oPYo.   8     .oPYo. 8oPYo. .oPYo.
+# L         //\\         s   8     .ooriB 8' 8  8 8    8 8    8 .oooo8   8     .oooo8 8    8 Yb.i
+# a        //  \\        L   8     8    8 8  8  8 8    8 8    8 8    8   8     8    8 8    8   'Yb.
+# b       //    \\       a   8oooo 'Yoozv 8  8  8 'YooP' 'YooP' 'YooP8   8oooo 'YoomB 'YsaB' 'YooP'
+# s                      m
+# L                      b
+# ambdaLabsLambdaLabsLambd
+
+CD=`pwd`/CocoaDialog.app/Contents/MacOS/CocoaDialog
+ADB=`pwd`/adb
+CONVERT=`pwd`/convert
+PARALLEL=`pwd`/parallel
+NAME="Glass Backup by Lambda Labs"
+function cdalert {
+	TITLE=$1
+	BODY=$2
+	"$CD" ok-msgbox --no-cancel --title "$1" --text "$1" --informative-text "$2"
+}
+# Returns the diff of the backup folder and glass.
+function backup_diff {
+	if [ "$(ls -A $BACKUP_FOLDER)" ]
+	then
+		"$ADB" shell ls "/sdcard/DCIM/Camera/*" | sed 's/\/sdcard\/DCIM\/Camera\///g' | sort -n | uniq | sed "1,/`ls $BACKUP_FOLDER | sort -n | uniq | tail -n1`/d"
+	else
+		"$ADB" shell ls "/sdcard/DCIM/Camera/*" | sed 's/\/sdcard\/DCIM\/Camera\///g' | sort -n | uniq
+	fi
+}
+
+function do_backup_in_folder {
+	folder=$1
+	mkdir -p $folder
+	cd $folder
+	number_of_files=$(backup_diff $folder | wc -l)
+	i=0
+	echo $number_of_files
+	echo $(backup_diff $folder)
+	(for f in `backup_diff $folder` 
+	do
+		echo `bc -l <<< "100 * ($i / $number_of_files)"` Backing up $i of $number_of_files.;
+		"$ADB" pull `echo /sdcard/DCIM/Camera/$f | tr -d '\015'` > /dev/null
+		i=$(($i + 1))
+	done) > >("$CD" progressbar --float --title "My Program")
+	cd -
+}
+
+function device_count {
+	echo $(($("$ADB" devices | wc -l) - 2))
+}
+
+function check_device {
+	if [ "$(device_count)" == "0" ]
+	then
+		cdalert "No devices found." "Your Glass isn't plugged in. Please connect the Glass and try again."
+		exit 1;
+	fi
+}
+
+function gen_gif {
+	rv=`"$CD" dropdown --title "Create an animated GIF?" \
+		--no-newline --text "Woul you like to create an animated GIF?" \
+		--items "Yes - Medium Quality (320x240)" "Yes - High Quality (640x480)" "No" \
+		--button1 OK --button2 Cancel`;
+	read PRESSED TYPE <<< $rv
+	if [[ "$PRESSED" == "1" ]]; then
+		if [[ "$TYPE" == "0" ]]; then
+			OUT_SZ=320
+		elif [[ "$TYPE" == "1" ]]; then
+			OUT_SZ=640
+		else
+			return;
+		fi
+	else
+		return;
+	fi
+	# if they hit OK
+	echo "Generating an animated gif."
+	IN_DIR=$1
+	OUT_FILE=$2
+	TMPF=tmp
+	RESIZED_DIR=$IN_DIR/$TMPF
+	mkdir -p $RESIZED_DIR
+	PADDING=4
+	# resize
+	ls $IN_DIR | grep .jpg$ | "$PARALLEL" "$CONVERT" -resize $OUT_SZ $IN_DIR/{} $RESIZED_DIR/{}
+	# overlay
+	ls $RESIZED_DIR | grep .jpg$ | "$PARALLEL" "$CONVERT" $RESIZED_DIR/{} logo.png -gravity SouthEast -geometry +$PADDING+$PADDING -composite -format jpg -quality 90 $RESIZED_DIR/{}
+
+	# "$CONVERT" to gif
+	"$CONVERT" -delay 15 $RESIZED_DIR/*.jpg $OUT_FILE
+
+	# open
+	open -a safari $OUT_FILE
+	
+	# clear
+	rm -rf $RESIZED_DIR
+}
+
+
+function main {
+	check_device;
+	CHOSEN_DIR=`"$CD" fileselect --title "Backup directory."\
+	    --text "Choose a directory to back up to." \
+	    --with-directory $HOME/Documents/ \
+	    --select-only-directories`
+	if ! [ -n "$CHOSEN_DIR" ]
+	then
+		cdalert "No Directory Chosen" "No backup will occur."
+		exit 1
+	fi
+	BACKUP_FOLDER="$CHOSEN_DIR/glass_backup_`date +%Y`"
+
+	echo "+----------------------------------------------------------"
+	echo "| Backing up your Glass's Photos & Videos to $BACKUP_FOLDER."
+	echo "+----------------------------------------------------------"
+
+	do_backup_in_folder $BACKUP_FOLDER
+
+	OUT_GIF=$BACKUP_FOLDER/out.gif
+	gen_gif $BACKUP_FOLDER $OUT_GIF
+
+	open $BACKUP_FOLDER;
+
+	echo "DONE. It's now safe to quit."
+}
+
+main

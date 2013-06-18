@@ -3,6 +3,10 @@ LambdaBackup
 
 A Backup Tool for Google Glass (for Mac OS X)
 
+Creates lifestreams like this:
+
+<img src="http://www.stephenbalaban.com/wp-content/uploads/2013/06/out.gif" />
+
 The secret is that the entire app is a shell script wrapped as an app.
 
 Tools used:
